@@ -47,7 +47,13 @@ require("just").setup({
         prompt = { "─", "│", " ", "│", "┌", "┐", "│", "│" }, 
         results = { "─", "│", "─", "│", "├", "┤", "┘", "└" },
         preview = { "─", "│", "─", "│", "┌", "┐", "┘", "└" }
-    }
+    },
+    get_just_executable = function() -- get the base executable for just
+        return "just"
+    end,
+    get_justfile = function () -- get the default justfile location, return nil for just autodetect
+        return string.format([=[%s/justfile]=], vim.fn.getcwd())
+    end
 })
 ```
 

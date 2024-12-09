@@ -11,7 +11,13 @@ local config = {
         prompt = {"─", "│", " ", "│", "┌", "┐", "│", "│"},
         results = {"─", "│", "─", "│", "├", "┤", "┘", "└"},
         preview = {"─", "│", "─", "│", "┌", "┐", "┘", "└"}
-    }
+    },
+    get_just_executable = function()
+        return "just"
+    end,
+    get_justfile = function ()
+        return string.format([=[%s/justfile]=], vim.fn.getcwd())
+    end
 }
 local pickers = require("telescope.pickers")
 local finders = require("telescope.finders")
@@ -56,25 +62,43 @@ end
 local function get_config_dir()
     return vim.fn.fnamemodify(debug.getinfo(1).source:sub(2), ":p:h")
 end
+local function get_just_basecommand()
+    local justexecutable = config.get_just_executable()
+    local justfile = config.get_justfile()
+    if justfile == nil then
+        return string.format([=[%s]=], justexecutable)
+    else
+        if vim.fn.filereadable(justfile) == 1 then
+            return string.format([=[%s -f %s]=], justexecutable, justfile)
+        else
+            error("Justfile not found in project directory")
+            return nil
+        end
+    end
+end
+
 local function get_task_names(lang)
     if lang == nil then
         lang = ""
     end
     local arr = {}
-    local justfile = string.format([=[%s/justfile]=], vim.fn.getcwd())
-    if vim.fn.filereadable(justfile) == 1 then
-        local taskList = vim.fn.system(string.format([=[just -f %s --list]=], justfile))
-        local taskArray = taskList:split("\n")
-        if taskArray[1]:starts_with("error") then
-            error(taskList)
-            return {}
-        end
-        table.shift(taskArray)
-        arr = taskArray
-    else
-        error("Justfile not found in project directory")
+    local taskList = ""
+    local just_basecmd = get_just_basecommand()
+    if just_basecmd == nil then
+        error("Failed to generate base just command")
         return {}
     end
+
+    taskList = vim.fn.system(string.format([=[%s --list]=], just_basecmd))
+    local taskArray = taskList:split("\n")
+    if taskArray[1]:starts_with("error") then
+        error(taskList)
+        return {}
+    end
+    table.shift(taskArray)
+    arr = taskArray
+
+    vim.notify("mid")
     local tbl = {}
     do
         local i = 0
@@ -179,11 +203,12 @@ local function check_keyword_arg(arg)
     return " "
 end
 local function get_task_args(task_name)
-    local justfile = string.format([=[%s/justfile]=], vim.fn.getcwd())
-    if vim.fn.filereadable(justfile) ~= 1 then
-        error("Justfile not found in project directory")
+    local just_basecmd = get_just_basecommand()
+    if just_basecmd == nil then
+        error("Failed to generate base just command")
+        return {}
     end
-    local task_info = vim.fn.system(string.format([=[just -f %s -s %s]=], justfile, task_name))
+    local task_info = vim.fn.system(string.format([=[%s -s %s]=], just_basecmd, task_name))
     if task_info:starts_with("alias") then
         task_info = task_info:sub(task_info:find("\n") + 1)
     end
@@ -243,10 +268,10 @@ local function task_runner(task_name)
         return
     end
     local args = arg_obj.args
-    local justfile = string.format([=[%s/justfile]=], vim.fn.getcwd())
-    if vim.fn.filereadable(justfile) ~= 1 then
-        error("Justfile not found in project directory")
-        return
+    local just_basecmd = get_just_basecommand()
+    if just_basecmd == nil then
+        error("Failed to generate base just command")
+        return {}
     end
     local handle =
         progress.handle.create(
@@ -257,7 +282,7 @@ local function task_runner(task_name)
             percentage = 0
         }
     )
-    local command = string.format([=[just -f %s -d . %s %s]=], justfile, task_name, table.concat(args, " "))
+    local command = string.format([=[%s %s %s]=], just_basecmd, task_name, table.concat(args, " "))
     local should_open_qf = (config.copen_on_run and task_name == "run") or config.copen_on_any
     if should_open_qf then
         vim.cmd("copen")
@@ -300,14 +325,20 @@ local function task_runner(task_name)
             end
         )
     end
-    local just_args = {"-f", justfile, "-d", ".", task_name}
+    local just_args = {}
+    local justfile = config.get_justfile()
+    if justfile ~= nil then
+        just_args = {"-f", justfile, task_name}
+    else
+        just_args = {task_name}
+    end
     for _, arg in ipairs(args) do
         table.insert(just_args, arg)
     end
     async_worker =
         async:new(
         {
-            command = "just",
+            command = config.get_just_executable(),
             args = just_args,
             env = vim.fn.environ(),
             cwd = vim.fn.getcwd(),
@@ -582,6 +613,8 @@ local function setup(opts)
         get_subtable_option(opts, "telescope_borders", "results", config.telescope_borders.results)
     config.telescope_borders.preview =
         get_subtable_option(opts, "telescope_borders", "preview", config.telescope_borders.preview)
+    config.get_just_executable = get_any_option(opts, "get_just_executable", config.get_just_executable)
+    config.get_justfile = get_any_option(opts, "get_justfile", config.get_justfile)
     vim.api.nvim_create_user_command("Just", run_task_cmd, {nargs = "?", bang = true, desc = "Run task"})
     vim.api.nvim_create_user_command("JustSelect", run_task_select, {nargs = 0, desc = "Open task picker"})
     vim.api.nvim_create_user_command("JustStop", stop_current_task, {nargs = 0, desc = "Stops current task"})
