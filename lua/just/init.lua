@@ -59,6 +59,16 @@ end
 local function inspect(val)
     print(vim.inspect(val))
 end
+local function run_process(cmdarray)
+    local stdout = ""
+    local on_exit = function (obj)
+        stdout = obj.stdout
+        vim.notify(obj.stdout)
+    end
+    vim.system(cmdarray, { text = true}, on_exit):wait()
+
+    return stdout
+end
 local function get_config_dir()
     return vim.fn.fnamemodify(debug.getinfo(1).source:sub(2), ":p:h")
 end
@@ -89,7 +99,7 @@ local function get_task_names(lang)
         return {}
     end
 
-    taskList = vim.fn.system(string.format([=[%s --list]=], just_basecmd))
+    taskList = run_process({just_basecmd, "--list"})
     local taskArray = taskList:split("\n")
     if taskArray[1]:starts_with("error") then
         error(taskList)
@@ -187,12 +197,12 @@ local function check_keyword_arg(arg)
             return os.getenv("USER")
         elseif caseExp == "PCNAME" then
             return (function()
-                local __tmp = vim.fn.system("uname -a")
+                local __tmp = run_process({"uname", "-a"})
                 return __tmp:split(" ")
             end)()[2]
         elseif caseExp == "OS" then
             return (function()
-                local __tmp = vim.fn.system("uname")
+                local __tmp = run_process({"uname"})
                 return __tmp:split("\n")
             end)()[1]
         else
@@ -207,7 +217,7 @@ local function get_task_args(task_name)
         error("Failed to generate base just command")
         return {}
     end
-    local task_info = vim.fn.system(string.format([=[%s -s %s]=], just_basecmd, task_name))
+    local task_info = run_process({just_basecmd, "-a", task_name})
     if task_info:starts_with("alias") then
         task_info = task_info:sub(task_info:find("\n") + 1)
     end
