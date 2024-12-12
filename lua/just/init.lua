@@ -98,7 +98,6 @@ local function get_task_names(lang)
     table.shift(taskArray)
     arr = taskArray
 
-    vim.notify("mid")
     local tbl = {}
     do
         local i = 0
@@ -415,11 +414,14 @@ local function task_runner(task_name)
         async_worker:start()
     end
 end
-local function task_select(opts)
+local function task_select(opts, tasks)
     if opts == nil then
         opts = {}
     end
-    local tasks = get_task_names()
+    -- If tasks were passed in, don't get them again.
+    if tasks == nil then
+        tasks = get_task_names()
+    end
     if #tasks == 0 then
         return
     end
@@ -460,7 +462,7 @@ local function run_task_select()
         warning("There are no tasks defined in justfile")
         return
     end
-    task_select(themes.get_dropdown({borderchars = config.telescope_borders}))
+    task_select(themes.get_dropdown({borderchars = config.telescope_borders}), tasks)
 end
 local function run_task_name(task_name)
     local tasks = get_task_names()
