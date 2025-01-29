@@ -17,7 +17,8 @@ local config = {
     end,
     get_justfile = function ()
         return string.format([=[%s/justfile]=], vim.fn.getcwd())
-    end
+    end,
+    debug = false
 }
 local pickers = require("telescope.pickers")
 local finders = require("telescope.finders")
@@ -63,7 +64,9 @@ local function run_process(cmdarray)
     local stdout = ""
     local on_exit = function (obj)
         stdout = obj.stdout
-        vim.notify(obj.stdout)
+        if config.debug then
+            vim.notify(obj.stdout)
+        end
     end
     vim.system(cmdarray, { text = true}, on_exit):wait()
 
