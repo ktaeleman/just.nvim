@@ -220,7 +220,7 @@ local function get_task_args(task_name)
         error("Failed to generate base just command")
         return {}
     end
-    local task_info = run_process({just_basecmd, "-a", task_name})
+    local task_info = run_process({just_basecmd, "-s", task_name})
     if task_info:starts_with("alias") then
         task_info = task_info:sub(task_info:find("\n") + 1)
     end
